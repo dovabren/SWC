@@ -1,0 +1,247 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+#title level 1 ## title level 2..
+**bold**
+*italics*
+
+R markdown is known as literate programming- mroe elaborate way to write everything down 
+
+
+1. load packages
+2. source(x.r) -- here, bring in functions.r which has other functions in it this way, you can load in all functions instead of loading them later. You can store all functions in this file and call at the beginging. source is also a useful if you have many functions that overlap for different projects so you can have all the functions in one place and call them all in different locations so you dont loose them 
+```{r}
+library(tidyverse)
+library(plotly)
+source("functions.r")
+```
+
+#Download Data
+Downloaded a file into R
+```{r}
+download.file("https://raw.githubusercontent.com/swcarpentry/r-novice-gapminder/gh-pages/_episodes_rmd/data/gapminder-FiveYearData.csv", destfile = "data/gapminder-FiveYearData.csv")
+```
+##Read and Display Data
+```{r}
+gapminder<- read.csv("data/gapminder-FiveYearData.csv")
+head(gapminder)
+```
+##Plot Data
+what is the life expectancy of those years 
+```{r}
+p <- ggplot(data=gapminder,aes(x=year,y=lifeExp)) +
+    geom_point()
+
+p
+```
+
+let's make it interactive 
+```{r}
+ggplotly(p)
+```
+
+#Making your own functions
+
+If you are repeating yourself in your code, you may be able to solve that problem by making your own function!
+
+newfunctionname<- function(argument1, argument2){
+  arg1+arg2
+}
+
+example here is standard error -- 
+sd= standard dev
+sqrt= suqare root 
+length- gives the sameple size bc counts how many are in the sample
+
+on the right, there will be a new section with functions that will display se (above, we have loaded in an R script with functions in it so dont need to load them everytime separately- kind of like installing a package, but it will show up in the environment)
+roxygen package (look into?)
+
+```{r}
+se<- function(x){
+  sd(x)/sqrt(length(x))
+}
+```
+
+try it on data:
+1. make a data set
+2. se(dataset)
+
+```{r}
+cars<- c(3,4,5,6,7,10)
+
+se(cars)
+```
+
+#Data manipulation with `dplyr`
+
+You will likely want to get **subsections** of your dataframe and/or calculate means of a variable for a certain subsection, `dplyr` is your friend!
+-- (put into single quotes for a function in R)
+learn to **select** columns from a dataframe with a-d columns : select(data.frame, a,c)
+
+can also exlude a subsection of data
+select(data.frame, -a,-c)
+
+look at the names by names() or row.names()
+```{r}
+gapminder <- read.csv("data/gapminder-FiveYearData.csv")
+year_country_gdp <- select(gapminder, year, country, gdpPercap)
+year_country_gdp<- select(gapminder,-pop, -continent, -lifeExp)
+names(year_country_gdp)
+```
+
+then we want to **filter**
+this is the same as select but for rows 
+can use logical vectors as arguments 
+can use **pipes** to filter %>% this is a pipe 
+its saying i want all of the before to be the first argument of the filter (so dont need to retype in the filter section-- dont need gapminder$continent if you filter this way, also building layers) 
+
+year_country_gdp_euro <- select(gapminder, year, country, gdpPercap) **%>%** filter(continent=="Europe")
+
+--use ctrl+shift+M for a shortcut to %>% 
+
+the above wont work bc removed continent but hten looking for continent 
+
+add a period in the first argument location bc we already specified part of the dataframe (which is always the first argument, so we essentially leave it blank)--> select(.,year, country, gdpPercap)
+
+```{r}
+year_country_gdp_euro <- gapminder %>% 
+  filter(continent=="Europe") %>%
+  select(.,year, country, gdpPercap)
+
+```
+
+the eqivalent without pipes would be: 
+euro<- filter (gapminder, continent="Europe")
+year_country_gdp_euro<- select (euro,year,country,gdpPercap)
+
+need to create an intermediate function of "euro" - order is very important
+reason to use pipes is not to rewrite the files over and over 
+
+
+exploring the amaxzing 'group_by' and 'summarize' functions 
+
+groupby-- alows you to take one big dataframe and separate them and do functions separately
+do suboperattions separately with summarize
+use group_by summarize together 
+
+summarize- will make a new column 
+mean_gdp- new name of the column
+=mean(gdpPercap)- the value within this new column
+
+add a new column with standard error of this gdp
+```{r}
+mean_gdp_percountry<- gapminder %>%
+  group_by(country) %>% 
+  summarize(mean_gdp=mean(gdpPercap), se_gdp=se(gdpPercap))
+
+mean_gdp_percountry
+```
+
+task: get mean, se, and sample size for lifeExp by continent 
+
+can get the sample size 2 ways: length(continent) or n() (can be blank inside, built in function to 'diplyr')
+
+```{r}
+mean_life_percontinent<- gapminder %>%
+  group_by(continent) %>% 
+  summarize(mean_life_expectancy=mean(lifeExp), se_life_expectancy=se(lifeExp), sample_size=n())
+
+mean_life_percontinent
+```
+
+can group by multiple things
+here, added by country to continent 
+
+```{r}
+mean_life_percontinent<- gapminder %>%
+  group_by(continent,country) %>% 
+  summarize(mean_life_expectancy=mean(lifeExp), se_life_expectancy=se(lifeExp), sample_size=n())
+
+mean_life_percontinent
+```
+
+combine diplyr with ggplot
+(select is rows, filter is column)
+the pipes move it to ggplot, whatevercame before the pipe is moved later
+once you call ggplot, the dataframe is fed into a plot so thats the output 
+add labels with +labs(x="", y="", title="")
+
+save plots with ggsave
+save data with write.csv --> folder "output" already exists 
+```{r}
+euro_countries <- gapminder %>% 
+  filter(continent== "Europe") %>% 
+  ggplot(aes(x=year,y=lifeExp, color=country)) +geom_line() + facet_wrap(~country) +labs(y= "Life Expectancy", x="Year", title= "Life Expectancy by Country per Year")
+
+euro_countries
+
+ggsave("output/euro.png")
+write.csv(mean_gdp_percountry, "output/mean_gdp_percountry.csv")
+```
+ 
+ (look up group_by and mutate together)
+
+#Data manipulation with `tidyr`
+
+R likes to have 'long' format data where every row is an observation and you have a single column for 'observations' the others serve to identify that observation. (exceptions apply when you have multiple types of observations) To switch back and forth from 'wide' (how we typically enter data in a spreadsheet) to 'long' use `tidyr`
+
+wide- how we usually view our data
+long- stacked data, how the computer prefers it 
+
+first load in gapminder 
+see that it is wide, go to long format 
+gather will stack columns and keep IDs together 
+
+obstype- 
+starts_with- like select command in diplyr - give it a small prompt that says select all the columns that start with X and will gather them together in one column - so it will change the way it looks 
+
+this will create a new file that stacks population, then life Expectancy, and gdp all organized by year-- all values of these are in a new column (obs_value)
+
+you can also remove starts_with and have 3:38
+```{r}
+# command to download the 'wide' data
+download.file("https://raw.githubusercontent.com/swcarpentry/r-novice-gapminder/gh-pages/data/gapminder_wide.csv", destfile = "data/gapminder_wide.csv")
+
+gapminder_wide<- read.csv("data/gapminder_wide.csv")
+gap_long <- gapminder_wide %>% 
+  gather(obstype_year, obs_value, starts_with('pop'), starts_with('lifeExp'), starts_with('gdpPercap'))
+
+head(gap_long)
+
+```
+
+now separate the observation and the year using the sep function 
+make a vector of the 2 things you are separating with titles 
+separate by underscore sep="_"
+
+pipes also help you build things once you know they work (they can also change the shape of the data frame)
+
+spread is opposite of gap -- look up more 
+```{r}
+gap_normal <- gap_long %>% 
+  separate(obstype_year, into=c("obs_type", "obs_year"), sep="_") %>% 
+  spread(obs_type, obs_value)
+head(gap_normal)
+
+```
+
+compare data frames
+
+```{r}
+all.equal(gapminder,gap_normal)
+```
+now rearrange data to make it equal bc wasnt equal before 
+
+```{r}
+gap_normal <- gap_normal %>% 
+  arrange(country,continent,obs_year)
+
+gap_normal
+```
+
+case_when instead of if else -- part of diplyr --look up 
